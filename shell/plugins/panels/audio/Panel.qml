@@ -13,6 +13,8 @@ Panel {
   id: root
   moduleName: "omarchy.audio"
   ipcTarget: "omarchy.audio"
+  // Answers its own target, to add refresh.
+  manageIpc: false
 
   readonly property var sink: Pipewire.defaultAudioSink
   readonly property var source: Pipewire.defaultAudioSource
@@ -208,6 +210,20 @@ Panel {
   readonly property var inputPeakNode: inputViaWpctl ? null : source
   readonly property bool inputLevelShown: !!inputPeakNode
 
+  // Pro audio's buffer and sample rate live in PipeWire's settings metadata,
+  // which no Quickshell service exposes, so omarchy-audio-pro reports them: read
+  // when the panel opens, after each change made here, and when the command
+  // pushes a refresh because the menu or a terminal changed them. Null while
+  // PipeWire isn't answering, which hides the section.
+  property var proStatus: null
+  readonly property bool proOn: !!proStatus && proStatus.enabled
+  // The pill the cursor sits on in each row, parked on the value in force.
+  property int proBufferIndex: 0
+  property int proRateIndex: 0
+  property bool proStatusStale: false
+  // A change asked for while another runs waits here; only the latest counts.
+  property var proQueued: null
+
   onRawAudioSinksChanged: if (rawAudioSinks.length > 0) cachedAudioSinks = rawAudioSinks
   onRawAudioSourcesChanged: if (rawAudioSources.length > 0) cachedAudioSources = rawAudioSources
 
@@ -215,9 +231,10 @@ Panel {
   //   "output"  — output slider + sink device list
   //   "input"   — input slider + source device list
   //   "streams" — per-app playback streams
+  //   "pro"     — pro audio switch, then its buffer and sample-rate pills
   // selectedIndex semantics within a section:
   //   -1            → on the slider row (h/l adjusts volume, m/Enter mute)
-  //   0..N-1        → on the Nth device/stream row
+  //   0..N-1        → on the Nth device/stream row (pro: 0 buffer, 1 rate)
   // Visuals derive from hasCursor/current via CursorSurface, never
   // from containsMouse — that's what keeps the highlight unique across
   // keyboard + mouse like wifi does.
@@ -247,6 +264,7 @@ Panel {
     if (section === "output") return displayAudioSinks.length
     if (section === "input") return displayAudioSources.length
     if (section === "streams") return displayAudioStreams.length
+    if (section === "pro") return proOn ? 2 : 0
     return 0
   }
 
@@ -254,12 +272,14 @@ Panel {
     if (section === "output") return true
     if (section === "input") return displayAudioSources.length > 0 || !!source
     if (section === "streams") return displayAudioStreams.length > 0
+    if (section === "pro") return !!proStatus
     return false
   }
 
   function sectionHasSlider(section) {
     if (section === "output") return true
     if (section === "input") return !!source
+    if (section === "pro") return true  // the switch sits where a slider row would
     return false  // stream rows carry their own sliders inline; not a section-level slider
   }
 
@@ -270,6 +290,7 @@ Panel {
     if (sectionVisible("output")) list.push("output")
     if (sectionVisible("input")) list.push("input")
     if (sectionVisible("streams")) list.push("streams")
+    if (sectionVisible("pro")) list.push("pro")
     return list
   }
 
@@ -346,9 +367,59 @@ Panel {
     }
   }
 
+  // h/l walks the pills of the pro row the cursor is on.
+  function movePro(delta) {
+    if (selectedIndex === 0) proBufferIndex = Math.max(0, Math.min(Model.proBuffers().length - 1, proBufferIndex + delta))
+    else if (selectedIndex === 1) proRateIndex = Math.max(0, Math.min(Model.proRates().length - 1, proRateIndex + delta))
+  }
+
+  function activatePro() {
+    if (selectedIndex === -1) setPro(!proOn)
+    else if (selectedIndex === 0) setProBuffer(Model.proBuffers()[proBufferIndex])
+    else if (selectedIndex === 1) setProRate(Model.proRates()[proRateIndex])
+  }
+
+  function setProCursor(row) {
+    cursorActive = true
+    focusSection = "pro"
+    selectedIndex = row
+  }
+
+  // Parks the pill cursors on the values in force, except under a cursor
+  // walking a row, which a refresh must not snap back.
+  function syncProIndexes() {
+    if (!proStatus) return
+    if (cursorActive && focusSection === "pro" && selectedIndex >= 0) return
+    proBufferIndex = Model.pillIndex(Model.proBuffers(), proStatus.buffer)
+    proRateIndex = Model.pillIndex(Model.proRates(), proStatus.rate)
+  }
+
+  function readProStatus() {
+    if (proStatusProc.running) {
+      proStatusStale = true
+      return
+    }
+    proStatusProc.running = true
+  }
+
+  function runPro(args) {
+    var command = ["omarchy-audio-pro"].concat(args)
+    if (proActionProc.running) {
+      proQueued = command
+      return
+    }
+    proActionProc.command = command
+    proActionProc.running = true
+  }
+
+  function setPro(on) { runPro([on ? "on" : "off"]) }
+  function setProBuffer(frames) { runPro(["on", "--buffer", String(frames)]) }
+  function setProRate(rate) { runPro(["on", "--rate", String(rate)]) }
+
   // Enter/Space: activate whatever the cursor is on.
   function activateCursor() {
     if (focusSection === "header") { toggleAllMuted(); return }
+    if (focusSection === "pro") { activatePro(); return }
     if (focusSection === "output") {
       if (selectedIndex === -1) { toggleOutputMute(); return }
       var sink = nodeFor(displayAudioSinks[selectedIndex])
@@ -370,6 +441,7 @@ Panel {
   onOpenedChanged: {
     if (opened) {
       refreshDisplayAudioModels()
+      readProStatus()
       focusSection = "output"
       selectedIndex = -1  // first keyboard cursor reveal starts on the output slider
       cursorActive = false
@@ -658,6 +730,49 @@ Panel {
   implicitWidth: button.implicitWidth
   implicitHeight: button.implicitHeight
 
+  ShellIpc {
+    target: root.ipcTarget
+
+    function open(): void { root.open() }
+    function close(): void { root.close() }
+    function show(): void { root.open() }
+    function hide(): void { root.close() }
+    function toggle(): void { root.toggle() }
+    // omarchy-audio-pro pushes this after a change; a closed panel reads on open.
+    // A change made here is read when it finishes, so its own push is skipped.
+    function refresh(): void { if (root.opened && !proActionProc.running) root.readProStatus() }
+  }
+
+  Process {
+    id: proStatusProc
+    command: ["omarchy-audio-pro", "status", "--json"]
+    stdout: StdioCollector {
+      onStreamFinished: {
+        root.proStatus = Model.parseProStatus(text)
+        root.syncProIndexes()
+        // Switching off takes the pill rows away from under the cursor.
+        root.clampCursor()
+      }
+    }
+    onExited: {
+      if (!root.proStatusStale) return
+      root.proStatusStale = false
+      // Deferred: the process still reports running while it signals exit.
+      Qt.callLater(root.readProStatus)
+    }
+  }
+
+  Process {
+    id: proActionProc
+    onExited: {
+      root.readProStatus()
+      if (!root.proQueued) return
+      var command = root.proQueued
+      root.proQueued = null
+      Qt.callLater(function() { root.runPro(command.slice(1)) })
+    }
+  }
+
   PwObjectTracker { objects: root.candidateSinks }
   PwObjectTracker { objects: root.candidateSources }
   PwObjectTracker { objects: root.audioStreams }
@@ -771,6 +886,7 @@ Panel {
       onMoveRequested: function(dx, dy) {
         if (!root.cursorActive) { root.cursorActive = true; return }
         if (dy !== 0) root.moveCursor(dy)
+        else if (dx !== 0 && root.focusSection === "pro") root.movePro(dx)
         else if (dx !== 0) root.adjustVolume(dx * 0.05)
       }
       onActivateRequested: if (root.cursorActive) root.activateCursor()
@@ -780,7 +896,7 @@ Panel {
         // 'm' mutes whatever the cursor is on: focused section's slider
         // for output/input, the focused stream for streams.
         if (t === "m" || t === "M") {
-          if (!root.cursorActive) return
+          if (!root.cursorActive || root.focusSection === "pro") return
           if (root.focusSection === "streams" && root.selectedIndex >= 0
               && root.selectedIndex < root.displayAudioStreams.length) {
             var s = root.nodeFor(root.displayAudioStreams[root.selectedIndex])
@@ -1114,6 +1230,126 @@ Panel {
               }
             }
           }
+
+          // ---- Pro audio ----
+          PanelSeparator {
+            visible: !!root.proStatus
+            foreground: root.bar.foreground
+          }
+
+          Column {
+            visible: !!root.proStatus
+            width: parent.width
+            spacing: Style.space(10)
+
+            // The switch rides on the header line, as the network panel's
+            // Automatic band switch does, and the header says how long one
+            // buffer takes while it is on.
+            Item {
+              width: parent.width
+              implicitHeight: Math.max(proHeader.implicitHeight, proSwitch.implicitHeight)
+
+              PanelSectionHeader {
+                id: proHeader
+                text: Model.proTitle(root.proStatus, Commons.I18n.t, Commons.I18n.formatNumber)
+                foreground: root.bar.foreground
+                fontFamily: root.bar.fontFamily
+                anchors.left: parent.left
+                anchors.verticalCenter: parent.verticalCenter
+              }
+
+              ToggleSwitch {
+                id: proSwitch
+                trackHeight: Math.round(proHeader.font.pixelSize * 1.2)
+                cursorPad: Style.space(3)
+                anchors.right: parent.right
+                anchors.verticalCenter: proHeader.verticalCenter
+                anchors.verticalCenterOffset: Math.round(proHeader.topPadding / 2)
+                checked: root.proOn
+                busy: proActionProc.running
+                hasCursor: root.cursorActive && root.focusSection === "pro" && root.selectedIndex === -1
+                onHasCursorChanged: if (hasCursor) root.ensureCursorVisible(proSwitch)
+                foreground: root.bar.foreground
+                onToggled: root.setPro(!root.proOn)
+                onHovered: function(isHovered) { if (isHovered) root.setProCursor(-1) }
+
+                PanelToolTip {
+                  visible: proSwitch.containsMouse
+                  text: Commons.I18n.t("audio.proTooltip")
+                  fontFamily: root.bar.fontFamily
+                }
+              }
+            }
+
+            // Small buffers only hold without realtime scheduling.
+            Text {
+              visible: root.proOn && !root.proStatus.realtime
+              width: parent.width
+              textFormat: Text.PlainText
+              wrapMode: Text.WordWrap
+              text: Commons.I18n.t("audio.notRealtime")
+              color: root.bar.urgent
+              font.family: root.bar.fontFamily
+              font.pixelSize: Style.font.caption
+            }
+
+            // Collapses with the switch, the way the band pills do.
+            Item {
+              width: parent.width
+              clip: true
+              visible: height > 0
+              height: root.proOn ? proPills.implicitHeight : 0
+              opacity: root.proOn ? 1 : 0
+
+              Behavior on height {
+                NumberAnimation { duration: Style.duration(140); easing.type: Easing.OutCubic }
+              }
+              Behavior on opacity {
+                NumberAnimation { duration: Style.duration(140); easing.type: Easing.OutCubic }
+              }
+
+              Column {
+                id: proPills
+                width: parent.width
+                spacing: Style.space(6)
+
+                // Both rows' pills start where the longer caption ends.
+                readonly property real captionWidth: Math.max(bufferCaption.advanceWidth, rateCaption.advanceWidth) + Style.space(8)
+
+                TextMetrics {
+                  id: bufferCaption
+                  font.family: root.bar.fontFamily
+                  font.pixelSize: Style.font.caption
+                  text: Commons.I18n.t("audio.buffer")
+                }
+
+                TextMetrics {
+                  id: rateCaption
+                  font.family: root.bar.fontFamily
+                  font.pixelSize: Style.font.caption
+                  text: Commons.I18n.t("audio.sampleRate")
+                }
+
+                ProPillRow {
+                  row: 0
+                  caption: Commons.I18n.t("audio.buffer")
+                  values: Model.proBuffers()
+                  cursorIndex: root.proBufferIndex
+                  live: root.proStatus ? root.proStatus.buffer : 0
+                  captionWidth: proPills.captionWidth
+                }
+
+                ProPillRow {
+                  row: 1
+                  caption: Commons.I18n.t("audio.sampleRate")
+                  values: Model.proRates()
+                  cursorIndex: root.proRateIndex
+                  live: root.proStatus ? root.proStatus.rate : 0
+                  captionWidth: proPills.captionWidth
+                }
+              }
+            }
+          }
         }
       }
     }
@@ -1356,6 +1592,69 @@ Panel {
         root.cursorActive = true
         root.focusSection = "streams"
         root.selectedIndex = streamRow.rowIndex
+      }
+    }
+  }
+
+  // One row of pro audio pills: the buffer sizes (row 0) or the sample rates
+  // (row 1). The value in force is selected; the cursor walks the row with h/l.
+  component ProPillRow: Row {
+    id: pillRow
+    required property int row
+    required property string caption
+    required property var values
+    required property int cursorIndex
+    required property int live
+    required property real captionWidth
+
+    width: parent ? parent.width : 0
+    spacing: Style.space(6)
+
+    readonly property real cellWidth: (width - captionWidth - spacing * values.length) / Math.max(1, values.length)
+
+    Text {
+      width: pillRow.captionWidth
+      anchors.verticalCenter: parent.verticalCenter
+      textFormat: Text.PlainText
+      text: pillRow.caption
+      color: Qt.darker(root.bar.foreground, 1.4)
+      font.family: root.bar.fontFamily
+      font.pixelSize: Style.font.caption
+      elide: Text.ElideRight
+    }
+
+    Repeater {
+      model: pillRow.values
+
+      delegate: Button {
+        id: pill
+        required property var modelData
+        required property int index
+
+        width: pillRow.cellWidth
+        text: pillRow.row === 0 ? Commons.I18n.formatNumber(modelData) : Model.rateLabel(modelData, Commons.I18n.formatNumber)
+        tooltipText: pillRow.row === 0
+          ? Model.bufferTooltip(modelData, root.proStatus ? root.proStatus.rate : 48000, Commons.I18n.t, Commons.I18n.formatNumber)
+          : Model.rateTooltip(modelData, Commons.I18n.t, Commons.I18n.formatNumber)
+        fontSize: Style.font.bodySmall
+        foreground: root.bar.foreground
+        fontFamily: root.bar.fontFamily
+        verticalPadding: Style.spacing.controlPaddingY + Style.space(2)
+        bordered: true
+        selected: pillRow.live === modelData
+        hasCursor: root.cursorActive && root.focusSection === "pro" && root.selectedIndex === pillRow.row && pillRow.cursorIndex === index
+        onHasCursorChanged: if (hasCursor) root.ensureCursorVisible(pill)
+
+        onClicked: {
+          if (pillRow.row === 0) root.setProBuffer(modelData)
+          else root.setProRate(modelData)
+        }
+        onHovered: function(isHovered) {
+          if (!isHovered) return
+          root.setProCursor(pillRow.row)
+          if (pillRow.row === 0) root.proBufferIndex = index
+          else root.proRateIndex = index
+        }
       }
     }
   }

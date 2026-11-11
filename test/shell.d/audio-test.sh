@@ -69,6 +69,20 @@ assert(!audio.isUntypedSource({ name: 'virtual_mic', isSink: false, isStream: tr
 assert(!audio.isUntypedSource({ name: '', isSink: false, isStream: false }, { '': true }), 'a nameless node is never an untyped source')
 assert(!audio.isUntypedSource({ name: 'virtual_mic', isSink: false, isStream: false }, {}), 'nothing is untyped before the listing')
 
+// Pro audio's status line comes from a command, so anything else it prints
+// (nothing while PipeWire is down, an error) must hide the section rather
+// than draw a zero buffer.
+const pro = audio.parseProStatus('{"enabled":true,"buffer":256,"rate":48000,"realtime":false}')
+assertDeepEqual(pro, { enabled: true, buffer: 256, rate: 48000, realtime: false }, 'audio reads the pro audio status')
+for (const text of ['', 'PipeWire is not running', '[]', '{"enabled":true,"buffer":0,"rate":48000}'])
+  assertEqual(audio.parseProStatus(text), null, 'audio reads no pro audio status from ' + JSON.stringify(text))
+assertEqual(audio.proTitle({ enabled: false, buffer: 1024, rate: 48000 }), 'PRO AUDIO', 'audio titles pro audio plainly while it is off')
+assertEqual(audio.proTitle(pro), 'PRO AUDIO · 5.3 ms', 'audio titles pro audio with the time one buffer takes')
+assertEqual(audio.rateLabel(44100), '44.1', 'audio writes 44.1 kHz with its decimal')
+assertEqual(audio.rateLabel(48000), '48', 'audio writes 48 kHz without one')
+assertEqual(audio.pillIndex(audio.proBuffers(), 256), 2, 'the pro audio cursor parks on the buffer in force')
+assertEqual(audio.pillIndex(audio.proBuffers(), 2048), 0, 'a buffer the panel does not offer parks the cursor on the first pill')
+
 const nodes = requireFromRoot('shell/Commons/AudioNodesModel.js')
 
 for (const name of ['quickshell', 'quickshell-peak-monitor'])

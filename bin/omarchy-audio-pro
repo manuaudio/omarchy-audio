@@ -88,6 +88,11 @@ live() {
   fi
 }
 
+# The audio panel shows the buffer and rate; tell an open one to read them again.
+refresh_shell() {
+  omarchy-shell -q omarchy.audio refresh
+}
+
 latency_ms() {
   awk -v b="$1" -v r="$2" 'BEGIN { printf "%.1f", b / r * 1000 }'
 }
@@ -188,6 +193,7 @@ pro_on() {
     omarchy-notification-send -g "$GLYPH" "$(omarchy-i18n audio.proOn)" \
       "$(omarchy-i18n audio.proSummary "$buffer" "$(awk -v r="$rate" 'BEGIN { print r / 1000 }')" "$(latency_ms "$buffer" "$rate")")"
   fi
+  refresh_shell
 }
 
 pro_off() {
@@ -208,6 +214,7 @@ pro_off() {
 
   echo "Pro audio off: the buffer and sample rate are back on PipeWire's defaults."
   omarchy-notification-send -g "$GLYPH" "$(omarchy-i18n audio.proOff)"
+  refresh_shell
 }
 
 action="${1:-status}"

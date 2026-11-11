@@ -273,8 +273,81 @@ function isUntypedSource(node, sourceAvailability) {
   return name !== "" && !!sourceAvailability && Object.prototype.hasOwnProperty.call(sourceAvailability, name)
 }
 
+// Pro audio: the buffer and sample rate `omarchy-audio-pro` forces. The panel
+// offers the sizes a recording session picks between; the command takes others.
+function proBuffers() {
+  return [64, 128, 256, 512, 1024]
+}
+
+function proRates() {
+  return [44100, 48000, 88200, 96000]
+}
+
+// Display numbers go through the shell's I18n.formatNumber when QML passes it;
+// Node tests leave it out and get plain English digits.
+function formatter(fmt) {
+  return typeof fmt === "function" ? fmt : function(v, d) { return d === undefined ? String(v) : Number(v).toFixed(d) }
+}
+
+// `omarchy-audio-pro status --json`, or null when PipeWire isn't answering
+// (the command then prints nothing on stdout) or the output is not its own.
+function parseProStatus(text) {
+  var data = null
+  try {
+    data = JSON.parse(String(text || ""))
+  } catch (e) {
+    return null
+  }
+  if (!data || typeof data !== "object" || Array.isArray(data)) return null
+  var buffer = Number(data.buffer)
+  var rate = Number(data.rate)
+  if (!(buffer > 0) || !(rate > 0)) return null
+  return { enabled: data.enabled === true, buffer: buffer, rate: rate, realtime: data.realtime === true }
+}
+
+function proLatency(buffer, rate, fmt) {
+  return formatter(fmt)(buffer / rate * 1000, 1)
+}
+
+// "PRO AUDIO", and once it is on the time one buffer takes: "PRO AUDIO · 2.7 ms".
+function proTitle(status, tr, fmt) {
+  var t = typeof tr === "function" ? tr : function(key, english) { return english }
+  if (!status || !status.enabled) return t("audio.pro", "PRO AUDIO")
+  return t("audio.proLatency", "PRO AUDIO · %1 ms").replace("%1", proLatency(status.buffer, status.rate, fmt))
+}
+
+// 44100 -> "44.1", 48000 -> "48": the pill. The tooltip adds the unit.
+function rateLabel(rate, fmt) {
+  var khz = rate / 1000
+  return khz % 1 === 0 ? formatter(fmt)(khz) : formatter(fmt)(khz, 1)
+}
+
+function rateTooltip(rate, tr, fmt) {
+  var t = typeof tr === "function" ? tr : function(key, english) { return english }
+  return t("audio.kiloHertz", "%1 kHz").replace("%1", rateLabel(rate, fmt))
+}
+
+function bufferTooltip(buffer, rate, tr, fmt) {
+  var t = typeof tr === "function" ? tr : function(key, english) { return english }
+  return t("audio.bufferTooltip", "%1 frames, %2 ms").replace("%1", formatter(fmt)(buffer)).replace("%2", proLatency(buffer, rate, fmt))
+}
+
+// Where the cursor lands in a row of pills: on the value in force, else the first.
+function pillIndex(values, value) {
+  var index = (values || []).indexOf(value)
+  return index >= 0 ? index : 0
+}
+
 if (typeof module !== "undefined") {
   module.exports = {
+    proBuffers: proBuffers,
+    proRates: proRates,
+    parseProStatus: parseProStatus,
+    proTitle: proTitle,
+    rateLabel: rateLabel,
+    rateTooltip: rateTooltip,
+    bufferTooltip: bufferTooltip,
+    pillIndex: pillIndex,
     isPlaybackStream: isPlaybackStream,
     isAudioSource: isAudioSource,
     nodeRow: nodeRow,

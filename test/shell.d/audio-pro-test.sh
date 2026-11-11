@@ -36,6 +36,7 @@ cat >"$test_bin/ps" <<'STUB'
 cat "$TEST_DATA/cls"
 STUB
 printf '#!/bin/bash\necho "$*" >>"$TEST_DATA/notifications"\n' >"$test_bin/omarchy-notification-send"
+printf '#!/bin/bash\necho "$*" >>"$TEST_DATA/shell"\n' >"$test_bin/omarchy-shell"
 chmod +x "$test_bin"/*
 
 pro() {
