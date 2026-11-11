@@ -1,0 +1,19 @@
+[Unit]
+Description=Omarchy combined audio device %i
+# WirePlumber links the members, so start once it is up.
+After=pipewire.service wireplumber.service
+Requires=pipewire.service
+Wants=wireplumber.service
+# The device loses its connection when PipeWire goes away, so restart with it.
+PartOf=pipewire.service
+
+[Service]
+Type=simple
+# Hosted as its own PipeWire client, as the speaker tuning is, so making or
+# removing a device needs no audio restart and a broken one stops only itself.
+ExecStart=/usr/bin/pipewire -c omarchy-audio-aggregate-%i.conf
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=graphical-session.target

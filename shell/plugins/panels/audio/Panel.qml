@@ -65,6 +65,8 @@ Panel {
       // A tuning's output is a playback stream too, but it is the processing
       // itself rather than an application, so it does not belong in the list.
       if (String(n.name || "").indexOf("omarchy_speaker_tuning") === 0) continue
+      // So are a combined device's streams to its members.
+      if (String(n.name || "").indexOf("output.omarchy_aggregate_") === 0) continue
       if (platformHides(n)) continue
       list.push(n)
     }

@@ -465,6 +465,18 @@
   "setup.language": {
     "label": "Language"
   },
+  "setup.audio": {
+    "label": "Audio"
+  },
+  "setup.audio.aggregate": {
+    "label": "Aggregate Device"
+  },
+  "setup.audio.multi-output": {
+    "label": "Multi-Output Device"
+  },
+  "setup.audio.remove": {
+    "label": "Remove Combined Device"
+  },
   "setup.network": {
     "label": "Network"
   },
