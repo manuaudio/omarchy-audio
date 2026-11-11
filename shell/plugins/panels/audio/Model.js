@@ -338,8 +338,73 @@ function pillIndex(values, value) {
   return index >= 0 ? index : 0
 }
 
+// `omarchy-audio-midi list --json`: the sequencer's ports, or none when the
+// output is not its own.
+function parseMidiPorts(text) {
+  var data = null
+  try {
+    data = JSON.parse(String(text || ""))
+  } catch (e) {
+    return []
+  }
+  if (!Array.isArray(data)) return []
+  var ports = []
+  for (var i = 0; i < data.length; i++) {
+    var p = data[i]
+    if (!p || typeof p !== "object" || !p.address) continue
+    ports.push({
+      address: String(p.address),
+      client: String(p.client || ""),
+      port: String(p.port || ""),
+      kind: String(p.kind || ""),
+      protocol: String(p.protocol || ""),
+      direction: String(p.direction || ""),
+      sendsTo: Array.isArray(p.sendsTo) ? p.sendsTo.map(String) : []
+    })
+  }
+  return ports
+}
+
+// The ports a person plays or patches from: devices and apps that send. Kernel
+// buses like Midi Through are always there and would only be noise.
+function midiSources(ports) {
+  var list = (ports || []).filter(function(p) {
+    return (p.kind === "hardware" || p.kind === "app") && (p.direction === "source" || p.direction === "both")
+  })
+  list.sort(function(a, b) {
+    if (a.kind !== b.kind) return a.kind === "hardware" ? -1 : 1
+    return String(a.address).localeCompare(String(b.address), undefined, { numeric: true })
+  })
+  return list
+}
+
+// Hardware names its ports after the device ("Launchkey MK3 MIDI 1"); apps
+// often do not ("output"), so the client leads where the port leaves it out.
+function midiLabel(port) {
+  if (!port.port || port.port.indexOf(port.client) >= 0) return port.port || port.client
+  return port.client + " " + port.port
+}
+
+// "MIDI 2.0 · to Surge XT, Vital", naming each destination by its client.
+function midiCaption(port, ports, tr) {
+  var t = typeof tr === "function" ? tr : function(key, english) { return english }
+  var names = []
+  for (var i = 0; i < port.sendsTo.length; i++) {
+    var name = port.sendsTo[i]
+    for (var j = 0; j < (ports || []).length; j++)
+      if (ports[j].address === port.sendsTo[i]) name = ports[j].client
+    if (names.indexOf(name) < 0) names.push(name)
+  }
+  var where = names.length > 0 ? t("audio.midiSendsTo", "to %1").replace("%1", names.join(", ")) : t("audio.midiUnconnected", "not connected")
+  return port.protocol + " · " + where
+}
+
 if (typeof module !== "undefined") {
   module.exports = {
+    parseMidiPorts: parseMidiPorts,
+    midiSources: midiSources,
+    midiLabel: midiLabel,
+    midiCaption: midiCaption,
     proBuffers: proBuffers,
     proRates: proRates,
     parseProStatus: parseProStatus,

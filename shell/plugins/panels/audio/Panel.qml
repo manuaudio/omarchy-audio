@@ -224,6 +224,11 @@ Panel {
   // A change asked for while another runs waits here; only the latest counts.
   property var proQueued: null
 
+  // MIDI ports from omarchy-audio-midi, read when the panel opens and when the
+  // command pushes a refresh. The section lists the ports that send.
+  property var midiPorts: []
+  readonly property var midiRows: Model.midiSources(midiPorts)
+
   onRawAudioSinksChanged: if (rawAudioSinks.length > 0) cachedAudioSinks = rawAudioSinks
   onRawAudioSourcesChanged: if (rawAudioSources.length > 0) cachedAudioSources = rawAudioSources
 
@@ -231,6 +236,7 @@ Panel {
   //   "output"  — output slider + sink device list
   //   "input"   — input slider + source device list
   //   "streams" — per-app playback streams
+  //   "midi"    — MIDI ports that send; Enter picks where each sends
   //   "pro"     — pro audio switch, then its buffer and sample-rate pills
   // selectedIndex semantics within a section:
   //   -1            → on the slider row (h/l adjusts volume, m/Enter mute)
@@ -264,6 +270,7 @@ Panel {
     if (section === "output") return displayAudioSinks.length
     if (section === "input") return displayAudioSources.length
     if (section === "streams") return displayAudioStreams.length
+    if (section === "midi") return midiRows.length
     if (section === "pro") return proOn ? 2 : 0
     return 0
   }
@@ -272,6 +279,7 @@ Panel {
     if (section === "output") return true
     if (section === "input") return displayAudioSources.length > 0 || !!source
     if (section === "streams") return displayAudioStreams.length > 0
+    if (section === "midi") return midiRows.length > 0
     if (section === "pro") return !!proStatus
     return false
   }
@@ -290,6 +298,7 @@ Panel {
     if (sectionVisible("output")) list.push("output")
     if (sectionVisible("input")) list.push("input")
     if (sectionVisible("streams")) list.push("streams")
+    if (sectionVisible("midi")) list.push("midi")
     if (sectionVisible("pro")) list.push("pro")
     return list
   }
@@ -412,6 +421,17 @@ Panel {
     proActionProc.running = true
   }
 
+  function readMidi() {
+    if (!midiProc.running) midiProc.running = true
+  }
+
+  // The picker is the menu, so the panel steps aside for it.
+  function connectMidi(port) {
+    if (!port) return
+    close()
+    Quickshell.execDetached(["omarchy-audio-midi", "connect", port.address])
+  }
+
   function setPro(on) { runPro([on ? "on" : "off"]) }
   function setProBuffer(frames) { runPro(["on", "--buffer", String(frames)]) }
   function setProRate(rate) { runPro(["on", "--rate", String(rate)]) }
@@ -420,6 +440,10 @@ Panel {
   function activateCursor() {
     if (focusSection === "header") { toggleAllMuted(); return }
     if (focusSection === "pro") { activatePro(); return }
+    if (focusSection === "midi" && selectedIndex >= 0 && selectedIndex < midiRows.length) {
+      connectMidi(midiRows[selectedIndex])
+      return
+    }
     if (focusSection === "output") {
       if (selectedIndex === -1) { toggleOutputMute(); return }
       var sink = nodeFor(displayAudioSinks[selectedIndex])
@@ -442,6 +466,7 @@ Panel {
     if (opened) {
       refreshDisplayAudioModels()
       readProStatus()
+      readMidi()
       focusSection = "output"
       selectedIndex = -1  // first keyboard cursor reveal starts on the output slider
       cursorActive = false
@@ -738,9 +763,13 @@ Panel {
     function show(): void { root.open() }
     function hide(): void { root.close() }
     function toggle(): void { root.toggle() }
-    // omarchy-audio-pro pushes this after a change; a closed panel reads on open.
-    // A change made here is read when it finishes, so its own push is skipped.
-    function refresh(): void { if (root.opened && !proActionProc.running) root.readProStatus() }
+    // omarchy-audio-pro and -midi push this after a change; a closed panel
+    // reads on open, and a pro audio change made here is read when it ends.
+    function refresh(): void {
+      if (!root.opened) return
+      if (!proActionProc.running) root.readProStatus()
+      root.readMidi()
+    }
   }
 
   Process {
@@ -759,6 +788,17 @@ Panel {
       root.proStatusStale = false
       // Deferred: the process still reports running while it signals exit.
       Qt.callLater(root.readProStatus)
+    }
+  }
+
+  Process {
+    id: midiProc
+    command: ["omarchy-audio-midi", "list", "--json"]
+    stdout: StdioCollector {
+      onStreamFinished: {
+        root.midiPorts = Model.parseMidiPorts(text)
+        root.clampCursor()
+      }
     }
   }
 
@@ -896,7 +936,7 @@ Panel {
         // 'm' mutes whatever the cursor is on: focused section's slider
         // for output/input, the focused stream for streams.
         if (t === "m" || t === "M") {
-          if (!root.cursorActive || root.focusSection === "pro") return
+          if (!root.cursorActive || root.focusSection === "pro" || root.focusSection === "midi") return
           if (root.focusSection === "streams" && root.selectedIndex >= 0
               && root.selectedIndex < root.displayAudioStreams.length) {
             var s = root.nodeFor(root.displayAudioStreams[root.selectedIndex])
@@ -1226,6 +1266,36 @@ Panel {
                 required property int index
                 width: panelColumn.width
                 node: root.nodeFor(modelData)
+                rowIndex: index
+              }
+            }
+          }
+
+          // ---- MIDI ----
+          PanelSeparator {
+            visible: root.midiRows.length > 0
+            foreground: root.bar.foreground
+          }
+
+          Column {
+            width: parent.width
+            spacing: Style.space(6)
+            visible: root.midiRows.length > 0
+
+            PanelSectionHeader {
+              text: Commons.I18n.t("audio.midi")
+              foreground: root.bar.foreground
+              fontFamily: root.bar.fontFamily
+            }
+
+            Repeater {
+              model: root.midiRows
+
+              MidiRow {
+                required property var modelData
+                required property int index
+                width: panelColumn.width
+                midiPort: modelData
                 rowIndex: index
               }
             }
@@ -1593,6 +1663,87 @@ Panel {
         root.focusSection = "streams"
         root.selectedIndex = streamRow.rowIndex
       }
+    }
+  }
+
+  // A MIDI port that sends, with its protocol and where it sends to. Enter or a
+  // click opens the menu to choose its destinations.
+  component MidiRow: CursorSurface {
+    id: midiRow
+    required property var midiPort
+    required property int rowIndex
+
+    hasCursor: root.cursorActive && root.focusSection === "midi" && root.selectedIndex === rowIndex
+    onHasCursorChanged: if (hasCursor) root.ensureCursorVisible(midiRow)
+    foreground: root.bar.foreground
+    fill: root.hoverFill
+    currentFill: root.selectedFill
+    implicitHeight: midiInner.implicitHeight + Style.spacing.xl
+
+    Row {
+      id: midiInner
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.leftMargin: Style.space(6)
+      anchors.rightMargin: Style.space(6)
+      spacing: Style.space(8)
+
+      Text {
+        textFormat: Text.PlainText
+        text: "󰣱"
+        color: root.bar.foreground
+        font.family: root.bar.fontFamily
+        font.pixelSize: Style.font.title
+        width: Style.space(22)
+        horizontalAlignment: Text.AlignHCenter
+        anchors.verticalCenter: parent.verticalCenter
+      }
+
+      Column {
+        width: parent.width - Style.space(22) - Style.space(8)
+        anchors.verticalCenter: parent.verticalCenter
+        spacing: Style.space(2)
+
+        Text {
+          width: parent.width
+          textFormat: Text.PlainText
+          text: Model.midiLabel(midiRow.midiPort)
+          color: root.bar.foreground
+          font.family: root.bar.fontFamily
+          font.pixelSize: Style.font.body
+          elide: Text.ElideRight
+        }
+
+        Text {
+          width: parent.width
+          textFormat: Text.PlainText
+          text: Model.midiCaption(midiRow.midiPort, root.midiPorts, Commons.I18n.t)
+          color: Qt.darker(root.bar.foreground, 1.4)
+          font.family: root.bar.fontFamily
+          font.pixelSize: Style.font.caption
+          elide: Text.ElideRight
+        }
+      }
+    }
+
+    MouseArea {
+      id: midiMouse
+      anchors.fill: parent
+      hoverEnabled: true
+      cursorShape: Qt.PointingHandCursor
+      onContainsMouseChanged: if (containsMouse) {
+        root.cursorActive = true
+        root.focusSection = "midi"
+        root.selectedIndex = midiRow.rowIndex
+      }
+      onClicked: root.connectMidi(midiRow.midiPort)
+    }
+
+    PanelToolTip {
+      visible: midiMouse.containsMouse
+      text: Commons.I18n.t("audio.midiConnect")
+      fontFamily: root.bar.fontFamily
     }
   }
 

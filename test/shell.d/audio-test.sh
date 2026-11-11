@@ -83,6 +83,21 @@ assertEqual(audio.rateLabel(48000), '48', 'audio writes 48 kHz without one')
 assertEqual(audio.pillIndex(audio.proBuffers(), 256), 2, 'the pro audio cursor parks on the buffer in force')
 assertEqual(audio.pillIndex(audio.proBuffers(), 2048), 0, 'a buffer the panel does not offer parks the cursor on the first pill')
 
+const midiPorts = audio.parseMidiPorts(JSON.stringify([
+  { address: '14:0', client: 'Midi Through', port: 'Midi Through Port-0', kind: 'virtual', protocol: 'MIDI 1.0', direction: 'both', sendsTo: [] },
+  { address: '130:0', client: 'Bitwig Studio', port: 'output', kind: 'app', protocol: 'MIDI 1.0', direction: 'source', sendsTo: [] },
+  { address: '128:0', client: 'Surge XT', port: 'input', kind: 'app', protocol: 'MIDI 1.0', direction: 'destination', sendsTo: [] },
+  { address: '24:0', client: 'Keystation', port: 'Keystation MIDI 1', kind: 'hardware', protocol: 'MIDI 2.0', direction: 'both', sendsTo: ['128:0'] },
+  { port: 'no address' }
+]))
+assertDeepEqual(audio.midiSources(midiPorts).map(p => p.address), ['24:0', '130:0'],
+  'audio lists the MIDI ports that send, devices first, without kernel buses or destinations')
+assertEqual(audio.midiLabel(midiPorts[3]), 'Keystation MIDI 1', 'a MIDI port named after its device keeps its name')
+assertEqual(audio.midiLabel(midiPorts[1]), 'Bitwig Studio output', 'a MIDI port with a bare name leads with its client')
+assertEqual(audio.midiCaption(midiPorts[3], midiPorts), 'MIDI 2.0 · to Surge XT', 'a MIDI port names where it sends')
+assertEqual(audio.midiCaption(midiPorts[1], midiPorts), 'MIDI 1.0 · not connected', 'an unconnected MIDI port says so')
+assertDeepEqual(audio.parseMidiPorts('The ALSA sequencer is not loaded'), [], 'audio reads no MIDI ports from an error')
+
 const nodes = requireFromRoot('shell/Commons/AudioNodesModel.js')
 
 for (const name of ['quickshell', 'quickshell-peak-monitor'])

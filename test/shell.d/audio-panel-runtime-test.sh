@@ -58,8 +58,18 @@ case "$1" in
   off) printf 'enabled=false\nbuffer=1024\nrate=48000\n' >"$state" ;;
 esac
 SH
+# One MIDI keyboard; picking where it sends is the menu's job, so a connect is
+# only logged.
+cat >"$stage/bin/omarchy-audio-midi" <<'SH'
+#!/bin/bash
+if [[ $1 == "list" ]]; then
+  echo '[{"address":"24:0","client":"Keystation","port":"Keystation MIDI 1","kind":"hardware","protocol":"MIDI 2.0","direction":"both","sendsTo":[]}]'
+else
+  echo "midi $*" >>"$AUDIO_TEST_PRO_LOG"
+fi
+SH
 printf '#!/bin/bash\nexit 0\n' >"$stage/bin/noop"
-chmod +x "$stage/bin/omarchy-audio-pro" "$stage/bin/noop"
+chmod +x "$stage/bin/omarchy-audio-pro" "$stage/bin/omarchy-audio-midi" "$stage/bin/noop"
 for command in omarchy-audio-output-sink omarchy-audio-sink-availability omarchy-audio-output-set-default omarchy-audio-input-set-default; do
   ln -s noop "$stage/bin/$command"
 done
@@ -72,4 +82,4 @@ output=$(HOME="$stage/home" OMARCHY_PATH="$ROOT" PATH="$stage/bin:$PATH" \
 if rg -q 'RESULT fail|ReferenceError|TypeError|Error:|Unable to assign|Binding loop' <<<"$output"; then
   fail "audio pro fixture has no QML errors" "$output"
 fi
-pass "audio pro audio switch, buffer and rate pills, keyboard navigation and change queue work in QML"
+pass "audio pro audio and MIDI sections, keyboard navigation and change queue work in QML"

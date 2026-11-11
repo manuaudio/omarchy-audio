@@ -195,6 +195,11 @@
   "lock.didNotLock": "Screen did not lock before suspend",
   "lock.unlockedNoLockScreen": "The session was left unlocked (no lock screen is configured).",
   "lock.unlockedTimeout": "The session was left unlocked (the shell did not secure the session within %1ms).",
+  "midi.connectFailed": "Some MIDI connections could not be changed",
+  "midi.noDestinations": "No MIDI port can receive from it",
+  "midi.noSources": "No MIDI port is sending",
+  "midi.sendFrom": "Send MIDI from",
+  "midi.sendTo": "Send MIDI to",
   "migrate.clickToRun": {
     "one": "Click to run %1 pending migration.",
     "other": "Click to run %1 pending migrations."

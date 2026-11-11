@@ -5,7 +5,7 @@ import qs.Commons
 import qs.Commons as Commons
 import "audio" as Audio
 
-// Drives the real audio panel's pro audio section through its key catcher, the
+// Drives the real audio panel's pro audio and MIDI sections through its key catcher, the
 // way the keys reach it. omarchy-audio-pro is a stub that keeps its state in a
 // file and logs every call; nothing here changes the real audio graph. The
 // panel is never opened, so nothing maps on the desktop running the test.
@@ -99,8 +99,9 @@ ShellRoot {
       test.check(panel.testEnsureContent() !== null, "panel content builds on demand")
       test.keys = panel.testKeys
       panel.readProStatus()
+      panel.readMidi()
       test.run([
-        { name: "status read", until: function() { return panel.proStatus !== null }, then: function() {
+        { name: "status read", until: function() { return panel.proStatus !== null && panel.midiRows.length === 1 }, then: function() {
           test.check(panel.visibleSections[panel.visibleSections.length - 1] === "pro", "pro audio is the last section")
           test.check(!panel.proOn && panel.sectionCount("pro") === 0, "pro audio off shows no pills")
           panel.cursorActive = true
@@ -141,7 +142,11 @@ ShellRoot {
         { name: "switched off", until: function() { return panel.proStatus && !panel.proOn }, then: function() {
           test.check(panel.focusSection === "pro" && panel.selectedIndex === -1, "switching off moves the cursor from the vanished pills to the switch")
           test.keys.moveRequested(0, -1)
-          test.check(panel.focusSection !== "pro", "up from the switch leaves for the section above")
+          test.check(panel.focusSection === "midi" && panel.selectedIndex === 0, "up from the switch reaches the MIDI port above")
+          test.keys.activateRequested(Qt.NoModifier)
+        } },
+        { name: "MIDI connect", until: function() { return test.log().indexOf("midi connect 24:0") >= 0 }, then: function() {
+          test.check(!panel.opened, "the panel steps aside for the MIDI picker")
         } }
       ])
     }
