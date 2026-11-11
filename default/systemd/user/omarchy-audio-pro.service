@@ -1,0 +1,16 @@
+[Unit]
+Description=Omarchy pro audio buffer size and sample rate
+# PipeWire forgets forced clock settings when it stops, so set them again each
+# time it starts, from the choice omarchy-audio-pro saved. The unit is only
+# installed and enabled while pro audio is on.
+After=pipewire.service
+PartOf=pipewire.service
+ConditionPathExists=%h/.local/state/omarchy/toggles/audio-pro
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/omarchy-audio-pro on
+
+[Install]
+WantedBy=pipewire.service

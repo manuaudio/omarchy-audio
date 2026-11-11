@@ -312,6 +312,12 @@
   "trigger.toggle.nightlight-off": {
     "label": "Nightlight Off"
   },
+  "trigger.toggle.pro-audio-on": {
+    "label": "Pro Audio On"
+  },
+  "trigger.toggle.pro-audio-off": {
+    "label": "Pro Audio Off"
+  },
   "trigger.toggle.screensaver-on": {
     "label": "Screensaver On"
   },

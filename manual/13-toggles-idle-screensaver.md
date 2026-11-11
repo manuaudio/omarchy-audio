@@ -11,6 +11,7 @@ From the terminal, the same switches are `omarchy toggle <thing>`. Run `omarchy 
 | Toggle | Hotkey | Command |
 | ------ | ------ | ------- |
 | Night light | — | `omarchy toggle nightlight` |
+| Pro audio | — | `omarchy audio pro toggle` |
 | Silence notifications | `Super + Ctrl + Alt + ,` | `omarchy toggle notification silencing` |
 | Stay awake (no idle lock) | `Super + Ctrl + I` | `omarchy toggle idle` |
 | Crash capture | — | `omarchy toggle crash-capture` |
@@ -56,6 +57,17 @@ profile {
 ```
 
 Then start hyprsunset at login by adding `o.launch_on_start("hyprsunset")` to `~/.config/hypr/autostart.lua`. The 4000K/6500K pair used by the toggle is fixed, so the config file is where you go if you want a different temperature.
+
+### Pro audio
+
+Left to itself, PipeWire picks a buffer size for whatever is playing, and for music or video that can be 2048 frames, over 40 ms between hitting a key and hearing it. That's fine for a movie and useless for playing an instrument. _Trigger > Toggle > Pro Audio On_ drops the buffer to 256 frames and locks the sample rate, like the buffer size and format settings in macOS's Audio MIDI Setup. It applies at once, playback carries on, and it stays on across logins until you turn it off.
+
+256 frames is the safe default while PipeWire's audio thread isn't running realtime; once it is, the default is 128. `omarchy audio pro status` tells you which. Pick your own from the terminal:
+
+```bash
+omarchy audio pro on --buffer 64 --rate 96000
+omarchy audio pro off
+```
 
 ### Do not disturb
 
