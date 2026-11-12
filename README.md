@@ -4,7 +4,7 @@ Pro audio pieces for [Omarchy](https://github.com/omacom/omarchy), written as fo
 
 | Branch | What it adds | Base | PR text |
 |---|---|---|---|
-| [`audio-pro`](../../compare/quattro...audio-pro) | `omarchy audio pro on/off`: a small PipeWire buffer and a locked sample rate, applied live, kept across logins, with a toggle in _Trigger > Toggle_ | `quattro` | [prs/1-audio-pro.md](prs/1-audio-pro.md) |
+| [`audio-pro`](../../compare/quattro...audio-pro) | `omarchy audio pro on/off`: a small PipeWire buffer and a locked sample rate, applied live and restored by a user unit when PipeWire starts, with a toggle in _Trigger > Toggle_ | `quattro` | [prs/1-audio-pro.md](prs/1-audio-pro.md) |
 | [`audio-panel-pro`](../../compare/audio-pro...audio-panel-pro) | A PRO AUDIO section in the audio panel: switch, buffer and sample-rate pills, keyboard cursor | `audio-pro` | [prs/2-audio-panel-pro.md](prs/2-audio-panel-pro.md) |
 | [`audio-aggregate`](../../compare/quattro...audio-aggregate) | `omarchy audio aggregate`: aggregate and multi-output devices on PipeWire's `combine-stream`, from the command or _Setup > Audio_ | `quattro` | [prs/3-audio-aggregate.md](prs/3-audio-aggregate.md) |
 | [`audio-midi`](../../compare/audio-panel-pro...audio-midi) | `omarchy audio midi`: list and connect ALSA sequencer ports, and a MIDI section in the audio panel | `audio-panel-pro` | [prs/4-audio-midi.md](prs/4-audio-midi.md) |
