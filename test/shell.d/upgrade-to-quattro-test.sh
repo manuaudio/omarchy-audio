@@ -265,6 +265,7 @@ exercise_package_install() {
       echo "$*" >>"$package_calls"
       [[ $* != *omarchy-realtime-repair* ]] || return "$repair_status"
     }
+    pacman() { [[ $1 == "-Q" && $2 == "${installed_jack:-}" ]]; }
     use_dev_packages=0
     root_path=$package_root_path
     eval "install_omarchy_quattro_packages() { $packages_body
@@ -293,4 +294,12 @@ exercise_package_install 0 || fail "Omarchy 4 upgrade goes on when the omarchy p
 ! grep -q omarchy-realtime-repair "$package_calls" && grep -q 'pacman -Syu' "$package_calls" ||
   fail "Omarchy 4 upgrade goes on when the omarchy package has no realtime repair" "$(cat "$package_calls")"
 pass "Omarchy 4 upgrade goes on when the omarchy package has no realtime repair"
+
+# pipewire-jack would replace a JACK server the owner kept, as updates don't.
+grep -E 'pacman -S .*pipewire-pulse' "$package_calls" | grep -qw pipewire-jack ||
+  fail "Omarchy 4 upgrade installs PipeWire's JACK" "$(cat "$package_calls")"
+installed_jack=jack2 exercise_package_install 0
+! grep -E 'pacman -S .*pipewire-pulse' "$package_calls" | grep -qw pipewire-jack ||
+  fail "Omarchy 4 upgrade keeps an installed JACK server" "$(cat "$package_calls")"
+pass "Omarchy 4 upgrade keeps an installed JACK server"
 rm -rf "$package_calls" "$repair_bin" "$package_root_path"

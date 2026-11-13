@@ -843,6 +843,11 @@ install_omarchy_quattro_packages() {
     libpulse
     wireplumber
   )
+  # pipewire-jack conflicts with jack and jack2, and --ask 4 below would remove
+  # them for it, so a machine that kept either keeps it, as updates already do.
+  if pacman -Q jack2 >/dev/null 2>&1 || pacman -Q jack >/dev/null 2>&1; then
+    mapfile -t audio_packages < <(printf '%s\n' "${audio_packages[@]}" | grep -vx pipewire-jack)
+  fi
   as_root pacman -S --needed --noconfirm --ask 4 --overwrite='*' "${audio_packages[@]}"
   mark_packages_explicit "${audio_packages[@]}"
 }
