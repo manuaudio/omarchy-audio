@@ -1,0 +1,9 @@
+# cpu.py on ai-nab6 (i7-12650H, pinned to core 3, AVX2+FMA path), PipeWire 1.6.8 spa-resample,
+# 300 s mono f32, min of 5 runs minus a same-rate pass. % of one core per channel of real time.
+# 44100->48001 forces the interpolated filter bank PipeWire uses when it adapts to clock drift.
+q4 44100->48000: 0.019% (4.0 ns/smp) | 48000->44100: 0.016% (3.6 ns/smp) | 96000->48000: 0.011% (2.2 ns/smp) | 44100->48001: 0.035% (7.2 ns/smp)
+q6 44100->48000: 0.023% (4.9 ns/smp) | 48000->44100: 0.021% (4.7 ns/smp) | 96000->48000: 0.022% (4.5 ns/smp) | 44100->48001: 0.049% (10.1 ns/smp)
+q8 44100->48000: 0.036% (7.4 ns/smp) | 48000->44100: 0.035% (8.0 ns/smp) | 96000->48000: 0.037% (7.6 ns/smp) | 44100->48001: 0.068% (14.2 ns/smp)
+q9 44100->48000: 0.040% (8.3 ns/smp) | 48000->44100: 0.044% (9.9 ns/smp) | 96000->48000: 0.050% (10.5 ns/smp) | 44100->48001: 0.089% (18.4 ns/smp)
+q10 44100->48000: 0.051% (10.6 ns/smp) | 48000->44100: 0.051% (11.5 ns/smp) | 96000->48000: 0.057% (11.9 ns/smp) | 44100->48001: 0.133% (27.7 ns/smp)
+q14 44100->48000: 0.309% (64.4 ns/smp) | 48000->44100: 0.266% (60.4 ns/smp) | 96000->48000: 0.471% (98.0 ns/smp) | 44100->48001: 0.736% (153.4 ns/smp)

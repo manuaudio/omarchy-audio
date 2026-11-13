@@ -19,6 +19,24 @@ Omarchy's maintainers merge small, measured, invisible improvements, and rarely 
 
 Sections 3 to 6 below describe the pro pieces as they were first designed for Omarchy itself. The branches in section 6 are kept as a record and are not proposed upstream.
 
+## Principle: sample rate is agnostic to the user (2026-11-12)
+
+Manu, verbatim:
+
+> "sample rate should be agnostic to the user, just letting you know in a subtle way as a user if you look for it that SRC is on, and that is a conversion process, but you should be able to play at whatever sample rate and digital audio should flow and flow cleanly"
+
+Nobody picks a sample rate to play something. Three things follow, one per layer:
+
+1. **The rate follows the source wherever the hardware allows.** Core: `default.clock.allowed-rates = [ 44100 48000 88200 96000 ]`, so an idle device switches to the stream's rate (#17520, ROADMAP item 1). As Manu put it later: "force the sample rate of the hardware to the sample rate of the file that's playing if it's available."
+2. **When conversion is unavoidable, it is transparent and silent.** That happens with a second stream at another rate, hardware that lacks the rate, or a Bluetooth link. Core: `resample.quality = 10` for streams and for ALSA and Bluetooth device nodes (ROADMAP item 2, `prs/5-resample-quality.md`).
+   - Measured with PipeWire's own resampler, PipeWire's default quality 4 is −13 dB at 20 kHz between 44.1 and 48 kHz.
+   - Quality 10 is flat within 0.002 dB to 20 kHz with every artefact below −140 dBFS. It costs 0.1% of one core per stereo stream on this box (0.27% when adapting to clock drift), and its filter delay is 1.9 ms.
+   - It has no toggle and no warning, and it is one value, not one per stream. JACK and pro-audio work run at the graph rate and are never resampled, so a cheaper setting for "realtime" streams would save nothing that matters.
+3. **The user sees that SRC is on only if they look for it.** Plugin: Backline's `omarchy-backline-src` lists each stream whose rate differs from its device's. The Audio Setup panel shows "SRC 44.1 → 48 kHz · Spotify" in muted caption text under the pro-audio header, and on a combined device's row, only while it is happening. There's no colour, bar icon or notification. This is Backline's D11. Omarchy itself gets no indicator: that would be a new visible element, which belongs in the plugin.
+
+Pro audio's locked rate (Backline) is the one deliberate exception, and the user chooses it for recording.
+
+
 ## 1. macOS → this box
 
 Each row was checked on the live system: `pw-dump`, `wpctl`, `pw-metadata`, `pw-top`, `aconnect`, `/proc/asound`, `/proc/config.gz`, `ps -L`.

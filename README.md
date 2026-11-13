@@ -10,8 +10,9 @@ Better audio for [Omarchy](https://github.com/omacom/omarchy), in two parts:
 | # | Change | Status |
 |---|---|---|
 | 1 | Let PipeWire follow the source's sample rate | Open upstream as [omacom/omarchy#17520](https://github.com/omacom/omarchy/pull/17520); PR text in [prs/0-sample-rate-follow.md](prs/0-sample-rate-follow.md) |
-| 2 | Switching the input leaves a recording of the desktop alone | To reproduce first |
-| 3 | Volume keys keep the left/right balance | Later |
+| 2 | Convert transparently when the rate can't follow (`resample.quality = 10`) | Measured, branch ready, not opened (PR cap); PR text in [prs/5-resample-quality.md](prs/5-resample-quality.md) |
+| 3 | Switching the input leaves a recording of the desktop alone | To reproduce first |
+| 4 | Volume keys keep the left/right balance | Later |
 
 ## Moved to Backline
 
