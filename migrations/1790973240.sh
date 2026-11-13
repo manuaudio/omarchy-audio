@@ -11,5 +11,8 @@ omarchy-pkg-add asus-proart-p14-audio
 
 if omarchy-audio-tuning match >/dev/null 2>&1; then
   omarchy-pkg-add lsp-plugins-lv2
-  omarchy-audio-tuning on
+  # A tuning that can't apply yet (EasyEffects running, no audio server during
+  # the update) must not stop the remaining migrations.
+  omarchy-audio-tuning on ||
+    echo "Speaker tuning not applied yet. After logging in, run: omarchy audio tuning on"
 fi
