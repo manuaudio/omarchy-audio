@@ -65,7 +65,7 @@ OUT
     echo "alsa_output.speakers"
     ;;
   "get-sink-volume "*)
-    echo "Volume: front-left: 32768 /  50% / -18.06 dB"
+    echo "${VOLUME:-Volume: front-left: 32768 /  50% / -18.06 dB}"
     ;;
   "get-sink-mute "*)
     echo "Mute: no"
@@ -121,6 +121,15 @@ grep -qx 'C pactl get-sink-volume alsa_output.speakers' "$CALLS" ||
 grep -qx 'C pactl get-sink-mute alsa_output.speakers' "$CALLS" ||
   fail 'audio-output-volume reads sink mute in the C locale' "$(calls)"
 pass 'audio-output-volume reads pactl outputs in the C locale'
+
+# A balance set elsewhere survives a key press: the average steps and every
+# channel scales with it.
+: >"$CALLS"
+VOLUME='Volume: front-left: 26214 /  40% / -23.88 dB,   front-right: 52429 /  80% / -5.81 dB' \
+  omarchy-audio-output-volume +6 2>/dev/null || true
+grep -q ' pactl set-sink-volume alsa_output.speakers 44% 88%$' "$CALLS" ||
+  fail 'audio-output-volume keeps the left/right balance' "$(calls)"
+pass 'audio-output-volume keeps the left/right balance'
 
 : >"$CALLS"
 (

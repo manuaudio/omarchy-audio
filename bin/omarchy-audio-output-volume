@@ -23,12 +23,21 @@ fi
 # pactl reports the same percentage scale wpctl does (both are the raw volume
 # over PA_VOLUME_NORM), so the OSD reads identically either way.
 # pactl translates its labels and yes/no; parse them in the C locale.
-volume_percent() {
+channel_percents() {
   LC_ALL=C pactl get-sink-volume "$sink" 2>/dev/null |
     awk 'NR == 1 {
       for (i = 1; i <= NF; i++)
-        if ($i ~ /%$/) {sub("%", "", $i); print $i; exit}
+        if ($i ~ /%$/) {sub("%", "", $i); printf "%s ", $i}
     }'
+}
+
+# The volume is the channels' average, as the shell's volume keys read it.
+average_percent() {
+  awk 'NF {for (i = 1; i <= NF; i++) sum += $i; printf "%d\n", sum / NF + 0.5}'
+}
+
+volume_percent() {
+  channel_percents | average_percent
 }
 
 volume_muted() {
@@ -56,7 +65,8 @@ elif [[ $action =~ ^([+-])([0-9]+)$ ]]; then
   direction="${BASH_REMATCH[1]}"
   step="${BASH_REMATCH[2]}"
 
-  current="$(volume_percent)"
+  levels="$(channel_percents)"
+  current="$(average_percent <<<"$levels")"
   if [[ -z $current ]]; then
     echo "Could not read volume for $sink." >&2
     exit 1
@@ -70,8 +80,14 @@ elif [[ $action =~ ^([+-])([0-9]+)$ ]]; then
     ((next >= 0)) || next=0
   fi
 
+  # Scale every channel by the same factor, as the shell's volume keys do, so a
+  # left/right balance set elsewhere survives a key press.
+  read -ra volumes < <(awk -v current="$current" -v target="$next" '{
+    for (i = 1; i <= NF; i++) printf "%d%% ", (current == 0 ? target : $i * target / current) + 0.5
+  }' <<<"$levels")
+
   pactl set-sink-mute "$sink" 0
-  pactl set-sink-volume "$sink" "${next}%"
+  pactl set-sink-volume "$sink" "${volumes[@]}"
 else
   echo "Unknown volume action: $action"
   exit 1
