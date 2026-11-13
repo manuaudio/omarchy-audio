@@ -1,5 +1,7 @@
 # Add pro audio mode for recording
 
+> **Moved to Backline.** Not proposed to Omarchy: this is now part of [Backline](https://github.com/manuaudio/backline-audio)'s Omarchy plugin. Kept as a record.
+
 Branch `audio-pro`, on `quattro` (`e485c6224`). Supersedes omacom/omarchy#13838.
 
 ## What changes

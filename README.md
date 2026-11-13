@@ -1,22 +1,39 @@
 # Omarchy audio
 
-Pro audio pieces for [Omarchy](https://github.com/omacom/omarchy), written as four small branches on its `quattro` branch (`e485c6224`), each ready to go in as its own PR. Proposal and discussion: [omacom/omarchy#13832](https://github.com/omacom/omarchy/discussions/13832).
+Better audio for [Omarchy](https://github.com/omacom/omarchy), in two parts:
 
-| Branch | What it adds | Base | PR text |
-|---|---|---|---|
-| [`audio-pro`](../../compare/quattro...audio-pro) | `omarchy audio pro on/off`: a small PipeWire buffer and a locked sample rate, applied live and restored by a user unit when PipeWire starts, with a toggle in _Trigger > Toggle_ | `quattro` | [prs/1-audio-pro.md](prs/1-audio-pro.md) |
-| [`audio-panel-pro`](../../compare/audio-pro...audio-panel-pro) | A PRO AUDIO section in the audio panel: switch, buffer and sample-rate pills, keyboard cursor | `audio-pro` | [prs/2-audio-panel-pro.md](prs/2-audio-panel-pro.md) |
-| [`audio-aggregate`](../../compare/quattro...audio-aggregate) | `omarchy audio aggregate`: aggregate and multi-output devices on PipeWire's `combine-stream`, from the command or _Setup > Audio_ | `quattro` | [prs/3-audio-aggregate.md](prs/3-audio-aggregate.md) |
-| [`audio-midi`](../../compare/audio-panel-pro...audio-midi) | `omarchy audio midi`: list and connect ALSA sequencer ports, and a MIDI section in the audio panel | `audio-panel-pro` | [prs/4-audio-midi.md](prs/4-audio-midi.md) |
+- **The core, for Omarchy itself.** Small defaults and fixes that make audio better for every Omarchy user, with no new mode, toggle or menu row, each sent upstream as one small PR in Omarchy's style. The ranked list and how they go upstream: [ROADMAP.md](ROADMAP.md).
+- **Pro audio, as a plugin.** Pro audio mode, aggregate and multi-output devices, and the MIDI manager now live in [Backline](https://github.com/manuaudio/backline-audio), an Omarchy plugin: Mac-style pro audio for Omarchy Linux.
 
-Each PR text says what was tested, what was measured on a running desktop (PipeWire 1.6.8, WirePlumber 0.5.17), and what could not be checked.
+## The core
 
-## Screenshots
+| # | Change | Status |
+|---|---|---|
+| 1 | Let PipeWire follow the source's sample rate | Open upstream as [omacom/omarchy#17520](https://github.com/omacom/omarchy/pull/17520); PR text in [prs/0-sample-rate-follow.md](prs/0-sample-rate-follow.md) |
+| 2 | Switching the input leaves a recording of the desktop alone | To reproduce first |
+| 3 | Volume keys keep the left/right balance | Later |
 
-The audio panel, run on a headless layer-shell surface against a real PipeWire.
+## Moved to Backline
+
+These four branches were first written for Omarchy itself, on `quattro` (`e485c6224`). They stay here as a record and are not proposed upstream; the code, with its tests, is in Backline's `omarchy/` plugin.
+
+| Branch | What it added | Now |
+|---|---|---|
+| [`audio-pro`](../../compare/quattro...audio-pro) | `omarchy audio pro on/off`: a small PipeWire buffer and a locked sample rate | `omarchy-backline-pro` |
+| [`audio-panel-pro`](../../compare/audio-pro...audio-panel-pro) | A PRO AUDIO section in the audio panel | Backline's Audio Setup panel |
+| [`audio-aggregate`](../../compare/quattro...audio-aggregate) | Aggregate and multi-output devices on PipeWire's `combine-stream` | `omarchy-backline-aggregate` |
+| [`audio-midi`](../../compare/audio-panel-pro...audio-midi) | List and connect ALSA sequencer ports | `omarchy-backline-midi` |
+
+Their PR texts are in [prs/](prs/), and the screenshots below are from them.
 
 | Pro audio, 256 frames at 48 kHz | 128 frames at 96 kHz | MIDI port | Multi-output device |
 |---|---|---|---|
 | ![](screenshots/pro/2-pro-on.png) | ![](screenshots/pro/3-128-at-96k.png) | ![](screenshots/midi/1-midi-row.png) | ![](screenshots/aggregate/1-output-list.png) |
+
+## Also here
+
+- [DESIGN.md](DESIGN.md): the design, from macOS's CoreAudio, CoreMIDI and Audio MIDI Setup to this split.
+- [STANDARDS.md](STANDARDS.md): Omarchy's conventions as this work follows them.
+- [research/PARITY.md](research/PARITY.md): parity with CoreAudio, CoreMIDI and Audio Units.
 
 The code in the branches is Omarchy's, under its [MIT license](https://github.com/omacom/omarchy/blob/quattro/LICENSE).

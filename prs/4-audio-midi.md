@@ -1,5 +1,7 @@
 # List and connect MIDI ports from the audio panel
 
+> **Moved to Backline.** Not proposed to Omarchy: this is now part of [Backline](https://github.com/manuaudio/backline-audio)'s Omarchy plugin. Kept as a record.
+
 Branch `audio-midi`, on `audio-panel-pro`. The command half doesn't depend on it; the panel half does.
 
 ## What changes

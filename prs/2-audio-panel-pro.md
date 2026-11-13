@@ -1,5 +1,7 @@
 # Add pro audio to the audio panel
 
+> **Moved to Backline.** Not proposed to Omarchy: this is now part of [Backline](https://github.com/manuaudio/backline-audio)'s Omarchy plugin. Kept as a record.
+
 Branch `audio-panel-pro`, on `audio-pro` (the previous PR).
 
 ## What changes

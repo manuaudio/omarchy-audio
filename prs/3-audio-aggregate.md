@@ -1,5 +1,7 @@
 # Combine audio devices into aggregate and multi-output devices
 
+> **Moved to Backline.** Not proposed to Omarchy: this is now part of [Backline](https://github.com/manuaudio/backline-audio)'s Omarchy plugin. Kept as a record.
+
 Branch `audio-aggregate`, on `quattro` (`e485c6224`).
 
 ## What changes
